@@ -4,7 +4,7 @@ Interface web para o sistema de prontuário eletrônico veterinário PetClinic. 
 
 ## Pré-requisitos
 
-- Browser moderno (Chrome, Firefox, Edge, Safari)
+- Browser (Chrome, Firefox, Edge, Safari)
 - [PetClinic API](https://github.com/paulopacifico/petclinic-api) rodando em `http://localhost:5001`
 
 ## Como usar
