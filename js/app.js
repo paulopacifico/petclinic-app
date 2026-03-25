@@ -160,3 +160,128 @@ async function verAnimaisTutor(tutorId) {
     `<span class="badge bg-primary me-1 mb-1">${a.nome} (${a.especie})</span>`
   ).join('');
 }
+
+async function renderAnimais(filtroEspecie = '') {
+  app.innerHTML = '<div class="loading">Carregando animais...</div>';
+  const data = await getAnimais(filtroEspecie);
+
+  app.innerHTML = `
+    <div class="section-header">
+      <h4 class="mb-0">🐾 Animais</h4>
+      <button class="btn btn-success btn-sm" onclick="toggleForm('form-animal')">+ Novo Animal</button>
+    </div>
+
+    <div id="feedback-animal" class="feedback"></div>
+
+    <div class="form-inline-box" id="form-animal">
+      <h6 class="mb-3">Cadastrar Animal</h6>
+      <div class="row g-2">
+        <div class="col-md-4">
+          <input type="text" class="form-control form-control-sm" id="a-nome" placeholder="Nome *">
+        </div>
+        <div class="col-md-4">
+          <input type="text" class="form-control form-control-sm" id="a-especie" placeholder="Espécie *">
+        </div>
+        <div class="col-md-4">
+          <input type="number" class="form-control form-control-sm" id="a-tutor" placeholder="ID do Tutor *">
+        </div>
+        <div class="col-md-4">
+          <input type="text" class="form-control form-control-sm" id="a-raca" placeholder="Raça">
+        </div>
+        <div class="col-md-2">
+          <select class="form-select form-select-sm" id="a-sexo">
+            <option value="">Sexo</option>
+            <option value="M">M</option>
+            <option value="F">F</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <input type="number" step="0.1" class="form-control form-control-sm" id="a-peso" placeholder="Peso (kg)">
+        </div>
+        <div class="col-md-3">
+          <input type="date" class="form-control form-control-sm" id="a-nasc">
+        </div>
+      </div>
+      <button class="btn btn-success btn-sm mt-3" onclick="salvarAnimal()">Salvar</button>
+    </div>
+
+    <div class="d-flex gap-2 mb-3">
+      <input type="text" class="form-control form-control-sm w-auto" id="filtro-especie"
+             placeholder="Filtrar por espécie" value="${filtroEspecie}">
+      <button class="btn btn-outline-secondary btn-sm" onclick="filtrarAnimais()">Buscar</button>
+      ${filtroEspecie ? '<button class="btn btn-link btn-sm" onclick="renderAnimais()">Limpar</button>' : ''}
+    </div>
+
+    <div class="row g-3" id="lista-animais">
+      ${data.animais.length === 0
+        ? '<div class="col"><p class="text-muted">Nenhum animal encontrado.</p></div>'
+        : data.animais.map(a => `
+          <div class="col-md-4">
+            <div class="animal-card">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <strong>${a.nome}</strong>
+                <span class="especie-badge">${a.especie}</span>
+              </div>
+              ${a.raca ? `<div class="text-muted small">${a.raca}</div>` : ''}
+              <div class="idade">${a.idade ?? ''} ${a.peso_kg ? '· ' + a.peso_kg + ' kg' : ''}</div>
+              <div class="small text-muted mt-1">Tutor: ${a.tutor_nome}</div>
+              <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-outline-success btn-sm flex-fill" onclick="verConsultasAnimal(${a.id}, '${a.nome.replace(/'/g, "\\'")}')">Consultas</button>
+                <button class="btn btn-outline-danger btn-sm" onclick="excluirAnimal(${a.id}, '${a.nome.replace(/'/g, "\\'")}')">✕</button>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+    </div>
+  `;
+}
+
+function filtrarAnimais() {
+  const especie = document.getElementById('filtro-especie').value.trim();
+  renderAnimais(especie);
+}
+
+async function salvarAnimal() {
+  const nome = document.getElementById('a-nome').value.trim();
+  const especie = document.getElementById('a-especie').value.trim();
+  const tutor_id = parseInt(document.getElementById('a-tutor').value);
+  const fb = document.getElementById('feedback-animal');
+
+  if (!nome || !especie || !tutor_id) {
+    return mostrarFeedback(fb, 'Nome, espécie e ID do tutor são obrigatórios.', 'erro');
+  }
+
+  const dados = { nome, especie, tutor_id };
+  const raca = document.getElementById('a-raca').value.trim();
+  const sexo = document.getElementById('a-sexo').value;
+  const peso = document.getElementById('a-peso').value;
+  const nasc = document.getElementById('a-nasc').value;
+  if (raca) dados.raca = raca;
+  if (sexo) dados.sexo = sexo;
+  if (peso) dados.peso_kg = parseFloat(peso);
+  if (nasc) dados.data_nascimento = nasc;
+
+  const res = await postAnimal(dados);
+  if (res.erro) return mostrarFeedback(fb, res.erro, 'erro');
+
+  mostrarFeedback(fb, `Animal "${res.animal.nome}" cadastrado com sucesso!`, 'sucesso');
+  renderAnimais();
+}
+
+async function excluirAnimal(id, nome) {
+  if (!confirm(`Excluir animal "${nome}"?`)) return;
+  const res = await deleteAnimal(id);
+  if (res.erro) return alert(res.erro);
+  renderAnimais();
+}
+
+async function verConsultasAnimal(animalId, nomeAnimal) {
+  const data = await getConsultasAnimal(animalId);
+  const consultas = data.consultas ?? [];
+  const msg = consultas.length === 0
+    ? `${nomeAnimal} não tem consultas registradas.`
+    : consultas.map(c =>
+        `• ${c.data_consulta} — ${c.motivo}${c.veterinario ? ' (' + c.veterinario + ')' : ''}`
+      ).join('\n');
+  alert(msg);
+}
