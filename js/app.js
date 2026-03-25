@@ -285,3 +285,113 @@ async function verConsultasAnimal(animalId, nomeAnimal) {
       ).join('\n');
   alert(msg);
 }
+
+async function renderConsultas() {
+  app.innerHTML = '<div class="loading">Carregando...</div>';
+  const animaisData = await getAnimais();
+
+  app.innerHTML = `
+    <div class="section-header">
+      <h4 class="mb-0">📋 Registrar Consulta</h4>
+    </div>
+
+    <div id="feedback-consulta" class="feedback"></div>
+
+    <div class="form-inline-box aberto" id="form-consulta">
+      <div class="row g-2">
+        <div class="col-md-4">
+          <label class="form-label small">Animal *</label>
+          <select class="form-select form-select-sm" id="c-animal">
+            <option value="">Selecione...</option>
+            ${animaisData.animais.map(a =>
+              `<option value="${a.id}">${a.nome} (${a.especie})</option>`
+            ).join('')}
+          </select>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label small">Motivo *</label>
+          <input type="text" class="form-control form-control-sm" id="c-motivo" placeholder="Motivo da consulta">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">Diagnóstico</label>
+          <textarea class="form-control form-control-sm" id="c-diagnostico" rows="2"></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">Tratamento</label>
+          <textarea class="form-control form-control-sm" id="c-tratamento" rows="2"></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">Veterinário</label>
+          <input type="text" class="form-control form-control-sm" id="c-vet" placeholder="Nome do veterinário">
+        </div>
+      </div>
+      <button class="btn btn-sm mt-3" style="background:#7e22ce;color:white" onclick="salvarConsulta()">
+        Registrar Consulta
+      </button>
+    </div>
+
+    <div id="lista-consultas-recentes"></div>
+  `;
+
+  if (animaisData.animais.length > 0) {
+    carregarConsultasRecentes(animaisData.animais);
+  }
+}
+
+async function carregarConsultasRecentes(animais) {
+  const container = document.getElementById('lista-consultas-recentes');
+  if (!container) return;
+  container.innerHTML = '<h6 class="mt-4 mb-3 text-secondary">Consultas por animal:</h6>';
+
+  for (const animal of animais.slice(0, 5)) {
+    const data = await getConsultasAnimal(animal.id);
+    if (data.consultas && data.consultas.length > 0) {
+      data.consultas.slice(0, 2).forEach(c => {
+        container.innerHTML += `
+          <div class="consulta-card">
+            <div class="d-flex justify-content-between">
+              <strong>${animal.nome}</strong>
+              <span class="data">${c.data_consulta}</span>
+            </div>
+            <div class="mt-1">${c.motivo}</div>
+            ${c.veterinario ? `<div class="small text-muted">${c.veterinario}</div>` : ''}
+            ${c.diagnostico ? `<div class="small mt-1 text-secondary">${c.diagnostico}</div>` : ''}
+          </div>
+        `;
+      });
+    }
+  }
+
+  if (container.children.length === 1) {
+    container.innerHTML += '<p class="text-muted">Nenhuma consulta registrada ainda.</p>';
+  }
+}
+
+async function salvarConsulta() {
+  const animal_id = parseInt(document.getElementById('c-animal').value);
+  const motivo = document.getElementById('c-motivo').value.trim();
+  const fb = document.getElementById('feedback-consulta');
+
+  if (!animal_id || !motivo) {
+    return mostrarFeedback(fb, 'Animal e motivo são obrigatórios.', 'erro');
+  }
+
+  const dados = { animal_id, motivo };
+  const diag = document.getElementById('c-diagnostico').value.trim();
+  const trat = document.getElementById('c-tratamento').value.trim();
+  const vet = document.getElementById('c-vet').value.trim();
+  if (diag) dados.diagnostico = diag;
+  if (trat) dados.tratamento = trat;
+  if (vet) dados.veterinario = vet;
+
+  const res = await postConsulta(dados);
+  if (res.erro) return mostrarFeedback(fb, res.erro, 'erro');
+
+  mostrarFeedback(fb, 'Consulta registrada com sucesso!', 'sucesso');
+  document.getElementById('c-animal').value = '';
+  document.getElementById('c-motivo').value = '';
+  document.getElementById('c-diagnostico').value = '';
+  document.getElementById('c-tratamento').value = '';
+  document.getElementById('c-vet').value = '';
+  carregarConsultasRecentes((await getAnimais()).animais);
+}
